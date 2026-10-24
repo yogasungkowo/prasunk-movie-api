@@ -1,205 +1,148 @@
-# Prasunk Movie API (Rust + Axum) 🎬🦀
+# Prasunk Movie & Subtitles API With Rust
 
-Implementasi backend API film sendiri berbasis **Rust** dan **Axum**, mengacu pada dokumen panduan `panduan_membuat_api_film_sendiri (1).md`. API ini bertindak sebagai perantara cerdas (*reverse proxy*) yang mengambil metadata dari **TMDB** (The Movie Database) dan menyisipkan tautan pemutar video embed (*multi-server embed player*).
+<p align="center">
+  <img src="https://img.shields.io/badge/Language-Rust-orange.svg?style=for-the-badge&logo=rust" alt="Rust" />
+  <img src="https://img.shields.io/badge/Framework-Axum%200.8-blue.svg?style=for-the-badge&logo=rust" alt="Axum" />
+  <img src="https://img.shields.io/badge/Async%20Runtime-Tokio-lightgrey.svg?style=for-the-badge&logo=tokio" alt="Tokio" />
+  <img src="https://img.shields.io/badge/Data%20Source-TMDB%20%2B%20OpenSubtitles-yellow.svg?style=for-the-badge" alt="Source" />
+  <img src="https://img.shields.io/badge/Author-yogasungkowo-purple.svg?style=for-the-badge" alt="Author" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" />
+</p>
+
+High-Performance RESTful API Film & Serial TV yang dibangun menggunakan bahasa pemrograman **Rust** dan framework **Axum 0.8**. Berfungsi sebagai *reverse proxy* cerdas yang menyinkronkan metadata dari **TMDB (The Movie Database)**, menyisipkan **7 provider pemutar video embed** siap pakai, serta terintegrasi langsung dengan **OpenSubtitles REST API v2** untuk pencarian dan pengunduhan subtitle bahasa Indonesia & global.
+
+Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 
 ---
 
 ## ⚡ Fitur Utama
 
-- 🦀 **Performa Tinggi:** Dibangun dengan Rust, Axum, dan Tokio asynchronous runtime.
-- 🔒 **Reverse Proxy Aman:** Menyembunyikan TMDB API key dari sisi frontend.
-- 🎥 **Multi-Server Video Embed:** Menghasilkan 7 server player video secara otomatis (VidLink, Videasy, VidFast, VidSrc, 2Embed, MultiEmbed, AutoEmbed) untuk film dan serial TV.
-- 🔍 **Pencarian & Trending:** Endpoint trending mingguan dan pencarian judul film/serial TV berpaginasi.
-- 🎞️ **Detail & Trailer YouTube:** Detail sinopsis, genre, poster, backdrop, daftar season (TV), serta link embed trailer YouTube resmi.
-- 🌐 **Web Player Tester Bawaan:** Halaman web modern dengan dark mode interaktif untuk menguji pemutar dan pencarian film langsung di browser (`http://localhost:3000`).
-- 🛡️ **CORS Enabled:** Dilengkapi middleware CORS agar dapat diakses dari klien frontend mana pun.
+- **🚀 Ultra-Fast & Low Memory**: Memanfaatkan asynchronous runtime **Tokio** dan pipeline serialisasi **Serde zero-copy** dengan konsumsi memori sangat minimal (~10–25 MB RAM).
+- **🔒 Secure Reverse Proxy**: Mengamankan `TMDB_API_KEY` dan `OPENSUBTITLES_API_KEY` di server tanpa membocorkannya ke sisi frontend / client.
+- **🎬 7 Multi-Server Video Embed**: Otomatis menghasilkan tautan stream iframe dari 7 server cadangan (*VidLink, Videasy, VidFast, VidSrc, 2Embed, MultiEmbed, AutoEmbed*) untuk film maupun episode serial TV.
+- **💬 Integrasi OpenSubtitles REST API v2**: Pencarian subtitle akurat berbasis `tmdb_id` dengan filter bahasa (`id`, `en`, dll.), metadata uploader, dan rating.
+- **📥 Direct Subtitle Download**: Endpoint redirector instan (`HTTP 307`) yang langsung mengunduh file `.srt` resmi berkecepatan tinggi dari CDN OpenSubtitles.
+- **🎞️ Trailer YouTube & Metadata Lengkap**: Menyaring trailer resmi YouTube (`youtube-nocookie.com/embed/{key}`), poster resolusi tinggi, backdrop, sinopsis, dan daftar season serial.
+- **🌐 Built-in Permissive CORS & Tracing**: Dilengkapi dengan middleware CORS fleksibel dan request tracing logger untuk pemantauan server yang mudah.
+- **🖥️ Built-in Interactive Web Player**: Dilengkapi antarmuka pemutar video responsif bawaan (dark mode) di `http://localhost:3000` untuk langsung mencoba menonton, mengganti server, dan mengunduh subtitle.
+- **🧪 Unit Tested**: Memiliki suite pengujian unit bawaan untuk memvalidasi generator URL server player dan normalisasi data.
 
 ---
 
-## 📁 Struktur Proyek
+## 🛠️ Tech Stack
 
-```
-prasunk-movie-api/
-├── Cargo.toml            # Konfigurasi dependensi Rust
-├── .env.example          # Contoh variabel lingkungan
-├── .env                  # Variabel lingkungan lokal (disimpan privat)
-├── static/
-│   └── index.html        # Antarmuka Web Player & API tester interaktif
-└── src/
-    ├── main.rs           # Entry point aplikasi & inisialisasi server Axum
-    ├── models.rs         # Model data TMDB & respon JSON klien
-    ├── tmdb.rs           # Service client TMDB & generator link embed player
-    └── handlers.rs       # Handler route endpoint API
-```
-
----
-
-## 🚀 Panduan Memulai
-
-### 1. Prasyarat
-- **Rust & Cargo** (disarankan v1.80 atau lebih baru)
-- **TMDB API Key (v3 auth)** dari [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
-- **OpenSubtitles API Key (Consumer)** *(Gratis)* dari [opensubtitles.com/en/consumers](https://www.opensubtitles.com/en/consumers)
-
-### 2. Konfigurasi Lingkungan (`.env`)
-Salin file `.env.example` ke `.env` jika belum ada:
-
-```bash
-cp .env.example .env
-```
-
-Buka file `.env` dan masukkan API Key TMDB & OpenSubtitles Anda:
-```env
-TMDB_API_KEY=masukkan_api_key_tmdb_anda_di_sini
-OPENSUBTITLES_API_KEY=masukkan_api_key_opensubtitles_di_sini
-PORT=3000
-HOST=0.0.0.0
-```
-
-### 3. Menjalankan Server
-Jalankan aplikasi dengan perintah:
-
-```bash
-cargo run
-```
-
-Atau kompilasi mode rilis dengan optimasi penuh:
-```bash
-cargo run --release
-```
-
-Server akan aktif di `http://localhost:3000`.
+- **Language**: [Rust](https://www.rust-lang.org/) (Edition 2024 / v1.80+)
+- **Web Framework**: [Axum](https://docs.rs/axum) (v0.8)
+- **Async Runtime**: [Tokio](https://tokio.rs/) (v1.x full)
+- **HTTP Client**: [Reqwest](https://docs.rs/reqwest) (v0.12)
+- **Serialization**: [Serde](https://serde.rs/) & [serde_json](https://docs.rs/serde_json)
+- **Middleware**: [Tower](https://docs.rs/tower) & [Tower-HTTP](https://docs.rs/tower-http) (CORS, Trace)
+- **Environment**: [Dotenvy](https://docs.rs/dotenvy)
+- **Logging**: [Tracing](https://docs.rs/tracing) & [Tracing-Subscriber](https://docs.rs/tracing-subscriber)
 
 ---
 
 ## 📡 Daftar Endpoint API
 
-Semua endpoint mengembalikan respon JSON dan mendukung CORS.
-
-### 1. Cek Status Server & Konfigurasi TMDB
-- **Endpoint:** `GET /health`
-- **Respon:**
-  ```json
-  {
-    "status": "ok",
-    "tmdb_configured": true,
-    "message": "API aktif dan TMDB API Key sudah terpasang.",
-    "attribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
-  }
-  ```
-
-### 2. Film / Serial Trending
-- **Endpoint:** `GET /film/trending?type=movie` atau `GET /film/trending?type=tv`
-- **Query Parameter:**
-  - `type` *(opsional)*: `movie` (default) atau `tv`
-- **Contoh Respon:**
-  ```json
-  {
-    "results": [
-      {
-        "id": 35791,
-        "type": "movie",
-        "title": "Resident Evil: Afterlife",
-        "poster": "https://image.tmdb.org/t/p/w342/abc.jpg",
-        "rating": 6.1,
-        "year": "2010"
-      }
-    ]
-  }
-  ```
-
-### 3. Pencarian Film / Serial
-- **Endpoint:** `GET /film/search?q=avengers&type=movie&page=1`
-- **Query Parameter:**
-  - `q`: Kata kunci pencarian (judul)
-  - `type` *(opsional)*: `movie` (default) atau `tv`
-  - `page` *(opsional)*: Nomor halaman (default: `1`)
-- **Contoh Respon:**
-  ```json
-  {
-    "page": 1,
-    "totalPages": 5,
-    "results": [...]
-  }
-  ```
-
-### 4. Detail Film / Serial TV & Daftar Link Pemutar Video Embed
-- **Endpoint:**
-  - Film: `GET /film/movie/:id`
-  - Serial TV: `GET /film/tv/:id?season=1&episode=1`
-- **Contoh:** `http://localhost:3000/film/movie/35791`
-
-### 5. Pencarian Subtitle (OpenSubtitles REST API v2)
-- **Endpoint:**
-  - Film: `GET /film/movie/:id/subtitles?lang=id,en`
-  - Serial TV: `GET /film/tv/:id/subtitles?lang=id,en&season=1&episode=1`
-- **Query Parameter:**
-  - `lang` *(opsional)*: Kode bahasa dipisah koma (contoh: `id`, `en`, atau `id,en`. Default: `id,en`)
-  - `season` *(opsional, untuk TV)*: Nomor musim
-  - `episode` *(opsional, untuk TV)*: Nomor episode
-- **Contoh Respon:**
-  ```json
-  {
-    "total": 3,
-    "subtitles": [
-      {
-        "id": "12345",
-        "file_id": 987654,
-        "language": "id",
-        "release": "Resident.Evil.Afterlife.2010.1080p.BluRay",
-        "file_name": "Resident.Evil.Afterlife.2010.id.srt",
-        "rating": 8.5,
-        "download_count": 420,
-        "download_url": "/subtitles/download/987654"
-      }
-    ]
-  }
-  ```
-
-### 6. Unduh Langsung File Subtitle (.SRT)
-- **Endpoint:** `GET /subtitles/download/:file_id`
-- Server akan mengarahkan otomatis (*HTTP 307 Redirect*) ke link unduhan file `.srt` resmi berkecepatan tinggi dari OpenSubtitles CDN.
-- **Contoh Respon:**
-  ```json
-  {
-    "id": 35791,
-    "type": "movie",
-    "title": "Resident Evil: Afterlife",
-    "overview": "Dalam dunia yang dirusak oleh infeksi virus...",
-    "genres": ["Action", "Horror", "Science Fiction"],
-    "poster": "https://image.tmdb.org/t/p/w500/abc.jpg",
-    "backdrop": "https://image.tmdb.org/t/p/w1280/backdrop.jpg",
-    "trailer": "https://www.youtube-nocookie.com/embed/XXXXX",
-    "servers": [
-      { "name": "VidLink", "url": "https://vidlink.pro/movie/35791" },
-      { "name": "Videasy", "url": "https://player.videasy.net/movie/35791" },
-      { "name": "VidFast", "url": "https://vidfast.pro/movie/35791" },
-      { "name": "VidSrc", "url": "https://vidsrc.to/embed/movie/35791" },
-      { "name": "2Embed", "url": "https://www.2embed.cc/embed/35791" },
-      { "name": "MultiEmbed", "url": "https://multiembed.mov/?video_id=35791&tmdb=1" },
-      { "name": "AutoEmbed", "url": "https://autoembed.co/movie/tmdb/35791" }
-    ]
-  }
-  ```
+| Method | Endpoint | Deskripsi |
+|---|---|---|
+| `GET` | `/` | Antarmuka Web Player interaktif & API tester bawaan |
+| `GET` | `/player` | Alias antarmuka Web Player |
+| `GET` | `/health` | Status kesehatan server dan cek konfigurasi API Key (TMDB & OpenSubtitles) |
+| `GET` | `/film/trending` | Daftar film atau serial TV yang sedang trending sepekan ini |
+| `GET` | `/film/search` | Pencarian film atau serial TV berdasarkan kata kunci judul |
+| `GET` | `/film/:type/:id` | Detail metadata film/serial, trailer YouTube, dan 7 tautan server video embed |
+| `GET` | `/film/:type/:id/subtitles` | Pencarian subtitle film/serial dari OpenSubtitles REST API v2 |
+| `GET` | `/subtitles/download/:file_id` | Unduh file `.srt` subtitle langsung (HTTP 307 Redirect ke CDN) |
 
 ---
 
-## 📺 Antarmuka Pengujian (Web Player)
+## ⚙️ Parameter & Filter Options
 
-Buka browser dan kunjungi:
-👉 `http://localhost:3000` atau `http://localhost:3000/player`
+### 1. Trending (`/film/trending`)
+| Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
+|---|---|---|---|
+| `type` | String | `movie` | Kategori media: `movie` (film) atau `tv` (serial TV) |
 
-Antarmuka ini sudah terintegrasi langsung dengan API Anda untuk:
-- Memilih dan menonton film langsung dengan pemutar video responsif 16:9.
-- Tombol switch server (*VidLink, Videasy, VidFast, VidSrc, 2Embed, MultiEmbed, AutoEmbed*) secara langsung jika ada server yang diblokir atau buffering.
-- Pencarian judul film secara dinamis.
-- Menjelajahi film trending pekan ini.
+### 2. Pencarian Judul (`/film/search`)
+| Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
+|---|---|---|---|
+| `q` | String | *wajib* | Kata kunci judul film atau serial (contoh: `avengers`) |
+| `type` | String | `movie` | Kategori media: `movie` atau `tv` |
+| `page` | Integer | `1` | Nomor halaman paginasi data |
+
+### 3. Detail & Embed Player (`/film/:type/:id`)
+| Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
+|---|---|---|---|
+| `:type` *(Path)* | String | *wajib* | `movie` atau `tv` |
+| `:id` *(Path)* | Integer | *wajib* | ID TMDB unik (contoh: `35791` untuk *Resident Evil: Afterlife*) |
+| `season` *(Query)* | Integer | `1` | Nomor Season (khusus kategori `tv`) |
+| `episode` *(Query)* | Integer | `1` | Nomor Episode (khusus kategori `tv`) |
+
+### 4. Pencarian Subtitle (`/film/:type/:id/subtitles`)
+| Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
+|---|---|---|---|
+| `lang` | String | `id,en` | Kode bahasa subtitle dipisah koma (contoh: `id`, `en`, atau `id,en`) |
+| `season` | Integer | `1` | Nomor Season serial TV |
+| `episode` | Integer | `1` | Nomor Episode serial TV |
 
 ---
 
-## 🧪 Menjalankan Pengujian (Unit Tests)
+## 🚀 Cara Menjalankan (Getting Started)
 
-Jalankan test bawaan untuk memastikan mapping server URL dan serialisasi data berjalan sempurna:
+### Persyaratan
+- [Rust & Cargo](https://www.rust-lang.org/tools/install) (versi 1.80 atau yang lebih baru)
+- **TMDB API Key (v3 auth)** dari [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) *(Gratis)*
+- **OpenSubtitles API Key (Consumer)** dari [opensubtitles.com/en/consumers](https://www.opensubtitles.com/en/consumers) *(Gratis)*
+
+### Instalasi & Konfigurasi
+
+1. **Clone repository ini:**
+   ```bash
+   git clone https://github.com/yogasungkowo/prasunk-movie-api.git
+   cd prasunk-movie-api
+   ```
+
+2. **Buat file lingkungan (`.env`):**
+   Salin dari template `.env.example`:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Isi API Key di dalam `.env`:**
+   ```env
+   # TMDB API Key (v3 auth)
+   TMDB_API_KEY=masukkan_api_key_tmdb_anda
+
+   # OpenSubtitles.com API Key (Consumer)
+   OPENSUBTITLES_API_KEY=masukkan_api_key_opensubtitles_anda
+
+   # Konfigurasi Server
+   PORT=3000
+   HOST=0.0.0.0
+   ```
+
+### Menjalankan Server
+
+- **Mode Development:**
+  ```bash
+  cargo run
+  ```
+  *(Secara default server berjalan di `http://0.0.0.0:3000`)*
+
+- **Menjalankan dengan custom port:**
+  ```bash
+  PORT=8080 cargo run
+  ```
+
+- **Build untuk performa optimal (Release):**
+  ```bash
+  cargo run --release
+  ```
+
+### Menjalankan Unit Test
+
+Untuk memastikan seluruh logic generator server embed dan normalisasi kartu berjalan tanpa galat:
 
 ```bash
 cargo test
@@ -207,7 +150,64 @@ cargo test
 
 ---
 
-## ⚠️ Atribusi & Lisensi TMDB
+## 📺 Web Player & Tester Bawaan
 
-*This product uses the TMDB API but is not endorsed or certified by TMDB.*
-Proyek ini dibuat untuk tujuan pembelajaran arsitektur API dan integrasi multimedia.
+Buka browser Anda dan kunjungi:
+👉 **`http://localhost:3000`**
+
+Antarmuka web modern bawaan siap digunakan untuk:
+- Memutar film dengan rasio layar 16:9 responsif.
+- Mengganti server video (*VidLink, Videasy, VidFast, VidSrc, 2Embed, MultiEmbed, AutoEmbed*) secara instan dengan satu klik.
+- Mencari dan mengunduh subtitle Bahasa Indonesia (🇮🇩) atau Inggris (🇬🇧).
+- Menjelajahi katalog film trending mingguan secara langsung.
+
+---
+
+## 📋 Contoh Penggunaan (cURL)
+
+```bash
+# 1. Cek info status server & API keys
+curl "http://localhost:3000/health"
+
+# 2. Mengambil daftar film trending
+curl "http://localhost:3000/film/trending?type=movie"
+
+# 3. Mengambil serial TV trending
+curl "http://localhost:3000/film/trending?type=tv"
+
+# 4. Pencarian judul film
+curl "http://localhost:3000/film/search?q=resident+evil&type=movie"
+
+# 5. Detail film + 7 server pemutar embed
+curl "http://localhost:3000/film/movie/35791"
+
+# 6. Detail serial TV Season 1 Episode 1
+curl "http://localhost:3000/film/tv/1399?season=1&episode=1"
+
+# 7. Cari subtitle Indonesia & Inggris untuk film
+curl "http://localhost:3000/film/movie/35791/subtitles?lang=id,en"
+
+# 8. Download file subtitle (.srt)
+curl -L -O "http://localhost:3000/subtitles/download/987654"
+```
+
+---
+
+## 👨‍💻 Author
+
+- **yogasungkowo**
+  - GitHub: [@yogasungkowo](https://github.com/yogasungkowo)
+
+---
+
+## 📄 Lisensi
+
+Didistribusikan di bawah lisensi [MIT](LICENSE). Silakan gunakan secara bebas untuk pengembangan proyek Anda.
+
+---
+
+## ⚠️ Disclaimer & Atribusi
+
+- *This product uses the TMDB API but is not endorsed or certified by TMDB.*
+- *This product uses the OpenSubtitles.com API for subtitle retrieval.*
+- Proyek ini dikembangkan secara *open-source* untuk keperluan edukasi dan riset teknis integrasi API multimedia. Seluruh hak cipta konten metadata dan video pemutar adalah milik masing-masing penyedia layanan.
