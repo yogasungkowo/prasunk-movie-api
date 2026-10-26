@@ -4,12 +4,12 @@
   <img src="https://img.shields.io/badge/Language-Rust-orange.svg?style=for-the-badge&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/Framework-Axum%200.8-blue.svg?style=for-the-badge&logo=rust" alt="Axum" />
   <img src="https://img.shields.io/badge/Async%20Runtime-Tokio-lightgrey.svg?style=for-the-badge&logo=tokio" alt="Tokio" />
-  <img src="https://img.shields.io/badge/Data%20Source-TMDB%20%2B%20OpenSubtitles-yellow.svg?style=for-the-badge" alt="Source" />
+  <img src="https://img.shields.io/badge/Data%20Source-TMDB%20%2B%20SubDL-yellow.svg?style=for-the-badge" alt="Source" />
   <img src="https://img.shields.io/badge/Author-yogasungkowo-purple.svg?style=for-the-badge" alt="Author" />
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" />
 </p>
 
-High-Performance RESTful API Film & Serial TV yang dibangun menggunakan bahasa pemrograman **Rust** dan framework **Axum 0.8**. Berfungsi sebagai *reverse proxy* cerdas yang menyinkronkan metadata dari **TMDB (The Movie Database)**, menyisipkan **7 provider pemutar video embed** siap pakai, serta terintegrasi langsung dengan **OpenSubtitles REST API v2** untuk pencarian dan pengunduhan subtitle bahasa Indonesia & global.
+High-Performance RESTful API Film & Serial TV yang dibangun menggunakan bahasa pemrograman **Rust** dan framework **Axum 0.8**. Berfungsi sebagai *reverse proxy* cerdas yang menyinkronkan metadata dari **TMDB (The Movie Database)**, menyisipkan **7 provider pemutar video embed** siap pakai, serta terintegrasi langsung dengan **SubDL API (Arsip Subscene & Database Subtitle Modern)** untuk pencarian dan pengunduhan file `.srt` subtitle bahasa Indonesia & global.
 
 Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 
@@ -18,13 +18,13 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 ## ⚡ Fitur Utama
 
 - **🚀 Ultra-Fast & Low Memory**: Memanfaatkan asynchronous runtime **Tokio** dan pipeline serialisasi **Serde zero-copy** dengan konsumsi memori sangat minimal (~10–25 MB RAM).
-- **🔒 Secure Reverse Proxy**: Mengamankan `TMDB_API_KEY` dan `OPENSUBTITLES_API_KEY` di server tanpa membocorkannya ke sisi frontend / client.
+- **🔒 Secure Reverse Proxy**: Mengamankan `TMDB_API_KEY` dan `SUBDL_API_KEY` di server tanpa membocorkannya ke sisi frontend / client.
 - **🎬 7 Multi-Server Video Embed**: Otomatis menghasilkan tautan stream iframe dari 7 server cadangan (*VidLink, Videasy, VidFast, VidSrc, 2Embed, MultiEmbed, AutoEmbed*) untuk film maupun episode serial TV.
-- **💬 Integrasi OpenSubtitles REST API v2**: Pencarian subtitle akurat berbasis `tmdb_id` dengan filter bahasa (`id`, `en`, dll.), metadata uploader, dan rating.
-- **📥 Direct Subtitle Download**: Endpoint redirector instan (`HTTP 307`) yang langsung mengunduh file `.srt` resmi berkecepatan tinggi dari CDN OpenSubtitles.
+- **💬 Integrasi SubDL API (Arsip Subscene)**: Pencarian subtitle akurat berbasis `tmdb_id` dengan filter bahasa (`id`, `en`, dll.), nama penerjemah, dan rilis film. Dilengkapi kuota harian besar (2000 request/hari di tier free).
+- **📥 Direct Single File Unpack (.SRT)**: Otomatis meng-unpack arsip sehingga client langsung mendapatkan file `.srt` siap pakai tanpa perlu mengekstrak `.zip` secara manual.
 - **🎞️ Trailer YouTube & Metadata Lengkap**: Menyaring trailer resmi YouTube (`youtube-nocookie.com/embed/{key}`), poster resolusi tinggi, backdrop, sinopsis, dan daftar season serial.
 - **🌐 Built-in Permissive CORS & Tracing**: Dilengkapi dengan middleware CORS fleksibel dan request tracing logger untuk pemantauan server yang mudah.
-- **🖥️ Built-in Interactive Web Player**: Dilengkapi antarmuka pemutar video responsif bawaan (dark mode) di `http://localhost:3000` untuk langsung mencoba menonton, mengganti server, dan mengunduh subtitle.
+- **🖥️ Built-in Interactive Web Player**: Dilengkapi antarmuka pemutar video responsif bawaan (dark mode) di `http://localhost:3000` (atau `http://localhost:3004`) untuk langsung mencoba menonton, mengganti server, dan mengunduh subtitle.
 - **🧪 Unit Tested**: Memiliki suite pengujian unit bawaan untuk memvalidasi generator URL server player dan normalisasi data.
 
 ---
@@ -37,6 +37,7 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 - **HTTP Client**: [Reqwest](https://docs.rs/reqwest) (v0.12)
 - **Serialization**: [Serde](https://serde.rs/) & [serde_json](https://docs.rs/serde_json)
 - **Middleware**: [Tower](https://docs.rs/tower) & [Tower-HTTP](https://docs.rs/tower-http) (CORS, Trace)
+- **Encoding**: [Urlencoding](https://docs.rs/urlencoding)
 - **Environment**: [Dotenvy](https://docs.rs/dotenvy)
 - **Logging**: [Tracing](https://docs.rs/tracing) & [Tracing-Subscriber](https://docs.rs/tracing-subscriber)
 
@@ -48,21 +49,30 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 |---|---|---|
 | `GET` | `/` | Antarmuka Web Player interaktif & API tester bawaan |
 | `GET` | `/player` | Alias antarmuka Web Player |
-| `GET` | `/v1/api/health` | Status kesehatan server dan cek konfigurasi API Key (TMDB & OpenSubtitles) |
-| `GET` | `/v1/api/film/trending` | Daftar film atau serial TV yang sedang trending sepekan ini |
+| `GET` | `/v1/api/health` | Status kesehatan server dan cek konfigurasi API Key (TMDB & SubDL) |
+| `GET` | `/v1/api/film/trending` | Daftar film / serial TV trending sepekan (Mendukung `page` & `limit`) |
+| `GET` | `/v1/api/film/popular` | Daftar film / serial TV terpopuler (Mendukung `page` & `limit`) |
+| `GET` | `/v1/api/film/now-playing` | Daftar film terbaru sedang tayang di bioskop (Mendukung `page` & `limit`) |
+| `GET` | `/v1/api/film/top-rated` | Daftar film / serial TV rating tertinggi (Mendukung `page` & `limit`) |
+| `GET` | `/v1/api/film/discover` | Katalog lengkap puluhan ribu film dengan filter genre/tahun/sorting |
 | `GET` | `/v1/api/film/search` | Pencarian film atau serial TV berdasarkan kata kunci judul |
 | `GET` | `/v1/api/film/:type/:id` | Detail metadata film/serial, trailer YouTube, dan 7 tautan server video embed |
-| `GET` | `/v1/api/film/:type/:id/subtitles` | Pencarian subtitle film/serial dari OpenSubtitles REST API v2 |
-| `GET` | `/v1/api/subtitles/download/:file_id` | Unduh file `.srt` subtitle langsung (HTTP 307 Redirect ke CDN) |
+| `GET` | `/v1/api/film/:type/:id/subtitles` | Pencarian subtitle film/serial dari SubDL API (Arsip Subscene) |
+| `GET` | `/v1/api/subtitles/download?target=...` | Unduh file `.srt` subtitle langsung (HTTP 307 Redirect ke CDN SubDL) |
 
 ---
 
 ## ⚙️ Parameter & Filter Options
 
-### 1. Trending (`/v1/api/film/trending`)
+### 1. Katalog & Paginasi Film (`/v1/api/film/trending`, `/popular`, `/now-playing`, `/top-rated`, `/discover`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
 |---|---|---|---|
 | `type` | String | `movie` | Kategori media: `movie` (film) atau `tv` (serial TV) |
+| `page` | Integer | `1` | Nomor halaman (misal: `1`, `2`, `3`, ...) |
+| `limit` | Integer | `20` | Jumlah item yang ditampilkan per halaman (misal: `10`, `12`, `20`, `24`, `50`) |
+| `sort_by` *(discover)* | String | `popularity.desc` | Opsi sorting: `popularity.desc`, `vote_average.desc`, `primary_release_date.desc` |
+| `genre` *(discover)* | String | - | ID Genre TMDB (contoh: `28` untuk Action, `27` untuk Horror) |
+| `year` *(discover)* | Integer | - | Filter tahun rilis (contoh: `2024`, `2026`) |
 
 ### 2. Pencarian Judul (`/v1/api/film/search`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
@@ -70,6 +80,7 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 | `q` | String | *wajib* | Kata kunci judul film atau serial (contoh: `avengers`) |
 | `type` | String | `movie` | Kategori media: `movie` atau `tv` |
 | `page` | Integer | `1` | Nomor halaman paginasi data |
+| `limit` | Integer | `20` | Jumlah item yang ditampilkan per halaman |
 
 ### 3. Detail & Embed Player (`/v1/api/film/:type/:id`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
@@ -93,7 +104,7 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 ### Persyaratan
 - [Rust & Cargo](https://www.rust-lang.org/tools/install) (versi 1.80 atau yang lebih baru)
 - **TMDB API Key (v3 auth)** dari [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) *(Gratis)*
-- **OpenSubtitles API Key (Consumer)** dari [opensubtitles.com/en/consumers](https://www.opensubtitles.com/en/consumers) *(Gratis)*
+- **SubDL API Key** dari [subdl.com](https://subdl.com) *(Gratis 2000 request/hari)*
 
 ### Instalasi & Konfigurasi
 
@@ -114,11 +125,11 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
    # TMDB API Key (v3 auth)
    TMDB_API_KEY=masukkan_api_key_tmdb_anda
 
-   # OpenSubtitles.com API Key (Consumer)
-   OPENSUBTITLES_API_KEY=masukkan_api_key_opensubtitles_anda
+   # SubDL API Key (Free tier 2000 req/day)
+   SUBDL_API_KEY=masukkan_api_key_subdl_anda
 
    # Konfigurasi Server
-   PORT=3000
+   PORT=3004
    HOST=0.0.0.0
    ```
 
@@ -167,28 +178,28 @@ Antarmuka web modern bawaan siap digunakan untuk:
 
 ```bash
 # 1. Cek info status server & API keys
-curl "http://localhost:3000/v1/api/health"
+curl "http://localhost:3004/v1/api/health"
 
 # 2. Mengambil daftar film trending
-curl "http://localhost:3000/v1/api/film/trending?type=movie"
+curl "http://localhost:3004/v1/api/film/trending?type=movie"
 
 # 3. Mengambil serial TV trending
-curl "http://localhost:3000/v1/api/film/trending?type=tv"
+curl "http://localhost:3004/v1/api/film/trending?type=tv"
 
 # 4. Pencarian judul film
-curl "http://localhost:3000/v1/api/film/search?q=resident+evil&type=movie"
+curl "http://localhost:3004/v1/api/film/search?q=resident+evil&type=movie"
 
 # 5. Detail film + 7 server pemutar embed
-curl "http://localhost:3000/v1/api/film/movie/35791"
+curl "http://localhost:3004/v1/api/film/movie/35791"
 
 # 6. Detail serial TV Season 1 Episode 1
-curl "http://localhost:3000/v1/api/film/tv/1399?season=1&episode=1"
+curl "http://localhost:3004/v1/api/film/tv/1399?season=1&episode=1"
 
-# 7. Cari subtitle Indonesia & Inggris untuk film
-curl "http://localhost:3000/v1/api/film/movie/35791/subtitles?lang=id,en"
+# 7. Cari subtitle Indonesia & Inggris untuk film (SubDL)
+curl "http://localhost:3004/v1/api/film/movie/35791/subtitles?lang=id,en"
 
-# 8. Download file subtitle (.srt)
-curl -L -O "http://localhost:3000/v1/api/subtitles/download/987654"
+# 8. Download langsung file subtitle (.srt)
+curl -L -O "http://localhost:3004/v1/api/subtitles/download?target=/subtitle/DeqJpzu3EV/ZJd3SgDuoc"
 ```
 
 ---
@@ -209,5 +220,5 @@ Didistribusikan di bawah lisensi [MIT](LICENSE). Silakan gunakan secara bebas un
 ## ⚠️ Disclaimer & Atribusi
 
 - *This product uses the TMDB API but is not endorsed or certified by TMDB.*
-- *This product uses the OpenSubtitles.com API for subtitle retrieval.*
+- *This product uses the SubDL API (subdl.com) for subtitle retrieval.*
 - Proyek ini dikembangkan secara *open-source* untuk keperluan edukasi dan riset teknis integrasi API multimedia. Seluruh hak cipta konten metadata dan video pemutar adalah milik masing-masing penyedia layanan.

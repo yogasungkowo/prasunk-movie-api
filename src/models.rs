@@ -2,11 +2,18 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Query parameters for trending endpoint
+/// Query parameters for paginated film list endpoints (trending, popular, now-playing, top-rated, discover)
 #[derive(Debug, Deserialize)]
-pub struct TrendingQuery {
+pub struct ListQuery {
     pub r#type: Option<String>,
+    pub page: Option<u32>,
+    pub limit: Option<usize>,
+    pub sort_by: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<u32>,
 }
+
+pub type TrendingQuery = ListQuery;
 
 /// Query parameters for search endpoint
 #[derive(Debug, Deserialize)]
@@ -14,6 +21,7 @@ pub struct SearchQuery {
     pub q: Option<String>,
     pub r#type: Option<String>,
     pub page: Option<u32>,
+    pub limit: Option<usize>,
 }
 
 /// Query parameters for movie/tv detail endpoint
@@ -23,7 +31,7 @@ pub struct DetailQuery {
     pub episode: Option<u32>,
 }
 
-/// Item returned in TMDB list (trending, search)
+/// Item returned in TMDB list (trending, search, discover)
 #[derive(Debug, Clone, Deserialize)]
 pub struct TmdbMediaItem {
     pub id: i64,
@@ -37,19 +45,17 @@ pub struct TmdbMediaItem {
     pub overview: Option<String>,
 }
 
-/// TMDB Search response
+/// TMDB Raw Paginated response (trending, popular, search, discover)
 #[derive(Debug, Deserialize)]
-pub struct TmdbSearchResponse {
-    pub page: u32,
-    pub total_pages: u32,
+pub struct TmdbPaginatedResponse {
+    pub page: Option<u32>,
+    pub total_pages: Option<u32>,
+    pub total_results: Option<u64>,
     pub results: Vec<TmdbMediaItem>,
 }
 
-/// TMDB Trending response
-#[derive(Debug, Deserialize)]
-pub struct TmdbTrendingResponse {
-    pub results: Vec<TmdbMediaItem>,
-}
+pub type TmdbSearchResponse = TmdbPaginatedResponse;
+pub type TmdbTrendingResponse = TmdbPaginatedResponse;
 
 /// TMDB Genre
 #[derive(Debug, Deserialize)]
@@ -110,20 +116,21 @@ pub struct CardItem {
     pub year: String,
 }
 
-/// Response for GET /film/trending
-#[derive(Debug, Serialize)]
-pub struct TrendingResponse {
+/// Unified Paginated Response for Client UI (Next.js, Vue, Mobile, Web Player)
+#[derive(Debug, Clone, Serialize)]
+pub struct PaginatedResponse {
+    pub page: u32,
+    #[serde(rename = "perPage")]
+    pub per_page: usize,
+    #[serde(rename = "totalPages")]
+    pub total_pages: u32,
+    #[serde(rename = "totalResults")]
+    pub total_results: u64,
     pub results: Vec<CardItem>,
 }
 
-/// Response for GET /film/search
-#[derive(Debug, Serialize)]
-pub struct SearchResponse {
-    pub page: u32,
-    #[serde(rename = "totalPages")]
-    pub total_pages: u32,
-    pub results: Vec<CardItem>,
-}
+pub type TrendingResponse = PaginatedResponse;
+pub type SearchResponse = PaginatedResponse;
 
 /// TV Show season summary for client
 #[derive(Debug, Clone, Serialize)]
@@ -163,33 +170,28 @@ pub struct SubtitleQuery {
     pub episode: Option<u32>,
 }
 
+/// Query parameters for subtitle download
+#[derive(Debug, Deserialize)]
+pub struct SubtitleDownloadQuery {
+    pub target: Option<String>,
+}
+
 /// Normalized client subtitle item
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleItem {
     pub id: String,
-    pub file_id: i64,
     pub language: String,
     pub release: String,
     pub file_name: String,
-    pub rating: Option<f64>,
-    pub download_count: Option<u64>,
+    pub author: Option<String>,
     pub download_url: String,
 }
 
-/// Response for GET /film/:type/:id/subtitles
+/// Response for GET /v1/api/film/:type/:id/subtitles
 #[derive(Debug, Serialize)]
 pub struct SubtitlesResponse {
     pub total: usize,
     pub subtitles: Vec<SubtitleItem>,
-}
-
-/// OpenSubtitles Download API Response
-#[derive(Debug, Deserialize)]
-pub struct OpenSubtitlesDownloadResponse {
-    pub link: Option<String>,
-    pub file_name: Option<String>,
-    pub message: Option<String>,
-    pub remaining: Option<i64>,
 }
 
 /// Error response structure

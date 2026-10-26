@@ -4,12 +4,13 @@ mod subtitles;
 mod tmdb;
 
 use handlers::{
-    detail_handler, download_subtitle_handler, health_handler, player_page_handler, search_handler,
-    subtitles_handler, trending_handler, AppState,
+    detail_handler, discover_handler, download_subtitle_handler, health_handler,
+    now_playing_handler, player_page_handler, popular_handler, search_handler, subtitles_handler,
+    top_rated_handler, trending_handler, AppState,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use subtitles::OpenSubtitlesService;
+use subtitles::SubdlService;
 use tmdb::TmdbService;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -29,9 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // 3. Baca konfigurasi TMDB & OpenSubtitles API Keys
+    // 3. Baca konfigurasi TMDB API Key
     let tmdb_api_key = std::env::var("TMDB_API_KEY").unwrap_or_default();
-    let opensubtitles_api_key = std::env::var("OPENSUBTITLES_API_KEY").unwrap_or_default();
 
     let port = std::env::var("PORT")
         .ok()
@@ -46,15 +46,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("✅ TMDB API Key berhasil dimuat.");
     }
 
-    let subtitles_service = OpenSubtitlesService::new(opensubtitles_api_key);
+    let subdl_api_key = std::env::var("SUBDL_API_KEY").unwrap_or_default();
+
+    let subtitles_service = SubdlService::new(subdl_api_key);
     if subtitles_service.is_configured() {
-        tracing::info!("✅ OpenSubtitles API Key berhasil dimuat.");
+        tracing::info!("✅ SubDL API Key berhasil dimuat.");
     } else {
-        tracing::warn!("ℹ️  OPENSUBTITLES_API_KEY belum diisi di .env.");
-        tracing::warn!("   Dapatkan API key gratis di: https://www.opensubtitles.com/en/consumers");
+        tracing::warn!("ℹ️  SUBDL_API_KEY belum diisi di .env.");
+        tracing::warn!("   Dapatkan API key gratis di: https://subdl.com");
     }
 
-    // 4. Siapkan App State Terpadu (TMDB + Subtitles)
+    // 4. Siapkan App State Terpadu (TMDB + SubDL)
     let app_state = Arc::new(AppState {
         tmdb: Arc::new(TmdbService::new(tmdb_api_key)),
         subtitles: Arc::new(subtitles_service),
@@ -70,6 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_routes = axum::Router::new()
         .route("/health", axum::routing::get(health_handler))
         .route("/film/trending", axum::routing::get(trending_handler))
+        .route("/film/popular", axum::routing::get(popular_handler))
+        .route("/film/now-playing", axum::routing::get(now_playing_handler))
+        .route("/film/top-rated", axum::routing::get(top_rated_handler))
+        .route("/film/discover", axum::routing::get(discover_handler))
         .route("/film/search", axum::routing::get(search_handler))
         .route("/film/{type}/{id}", axum::routing::get(detail_handler))
         .route(
@@ -77,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             axum::routing::get(subtitles_handler),
         )
         .route(
-            "/subtitles/download/{file_id}",
+            "/subtitles/download",
             axum::routing::get(download_subtitle_handler),
         );
 

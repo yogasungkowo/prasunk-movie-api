@@ -1,50 +1,50 @@
 #![allow(dead_code)]
 
-use crate::models::{OpenSubtitlesDownloadResponse, SubtitleItem};
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE, USER_AGENT};
+use crate::models::SubtitleItem;
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
-use serde_json::json;
 use std::collections::HashMap;
 
-const OS_API_URL: &str = "https://api.opensubtitles.com/api/v1";
-const APP_USER_AGENT: &str = "PrasunkMovieApi v0.1.0";
+const SUBDL_API_URL: &str = "https://api.subdl.com/api/v1/subtitles";
+const SUBDL_DL_BASE: &str = "https://dl.subdl.com";
+const APP_USER_AGENT: &str = "PrasunkMovieApi/1.0";
 
 #[derive(Debug, Deserialize)]
-struct OsSubtitlesResponse {
-    pub total_count: Option<usize>,
-    pub data: Option<Vec<OsSubtitleData>>,
+struct SubdlResponse {
+    pub status: bool,
+    pub subtitles: Option<Vec<SubdlSubtitle>>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OsSubtitleData {
-    pub id: Option<String>,
-    pub attributes: Option<OsSubtitleAttributes>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OsSubtitleAttributes {
-    pub subtitle_id: Option<String>,
+struct SubdlSubtitle {
+    pub release_name: Option<String>,
+    pub name: Option<String>,
+    pub lang: Option<String>,
+    pub author: Option<String>,
+    pub url: Option<String>,
     pub language: Option<String>,
-    pub download_count: Option<u64>,
-    pub ratings: Option<f64>,
-    pub release: Option<String>,
-    pub files: Option<Vec<OsSubtitleFile>>,
+    pub unpack_files: Option<Vec<SubdlUnpackFile>>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OsSubtitleFile {
-    pub file_id: Option<i64>,
-    pub file_name: Option<String>,
+struct SubdlUnpackFile {
+    pub file_n_id: Option<String>,
+    pub name: Option<String>,
+    pub release_name: Option<String>,
+    pub language: Option<String>,
+    pub format: Option<String>,
+    pub url: Option<String>,
 }
 
 #[derive(Clone)]
-pub struct OpenSubtitlesService {
+pub struct SubdlService {
     client: Client,
     api_key: String,
 }
 
-impl OpenSubtitlesService {
+impl SubdlService {
     pub fn new(api_key: String) -> Self {
         Self {
             client: Client::builder()
@@ -55,25 +55,12 @@ impl OpenSubtitlesService {
         }
     }
 
-    /// Cek apakah OpenSubtitles API Key sudah diatur
+    /// Cek apakah SubDL API Key sudah dikonfigurasi
     pub fn is_configured(&self) -> bool {
         let key = self.api_key.trim();
         !key.is_empty()
-            && key != "your_opensubtitles_api_key_here"
-            && key != "isi_key_opensubtitles_di_sini"
-    }
-
-    /// Siapkan headers standar untuk OpenSubtitles API v2
-    fn build_headers(&self) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static(APP_USER_AGENT));
-        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
-        if let Ok(val) = HeaderValue::from_str(self.api_key.trim()) {
-            headers.insert("Api-Key", val);
-        }
-        headers
+            && key != "your_subdl_api_key_here"
+            && key != "isi_key_subdl_di_sini"
     }
 
     /// Cari subtitle berdasarkan ID TMDB
@@ -88,40 +75,44 @@ impl OpenSubtitlesService {
         if !self.is_configured() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "OPENSUBTITLES_API_KEY belum dikonfigurasi di file .env. Dapatkan key gratis di https://www.opensubtitles.com/en/consumers".to_string(),
+                "SUBDL_API_KEY belum dikonfigurasi di file .env. Dapatkan key gratis di https://subdl.com".to_string(),
             ));
         }
 
-        let url = format!("{}/subtitles", OS_API_URL);
         let langs = languages.unwrap_or("id,en");
+        let subdl_type = if media_type == "tv" { "tv" } else { "movie" };
 
         let mut query: HashMap<&str, String> = HashMap::new();
+        query.insert("api_key", self.api_key.clone());
         query.insert("tmdb_id", tmdb_id.to_string());
+        query.insert("type", subdl_type.to_string());
         query.insert("languages", langs.to_string());
+        query.insert("unpack", "1".to_string()); // Otomatis unpack ke file .srt langsung
 
-        if media_type == "tv" {
-            query.insert("type", "episode".to_string());
+        if subdl_type == "tv" {
             if let Some(s) = season {
-                query.insert("season_number", s.to_string());
+                query.insert("season", s.to_string());
             }
             if let Some(e) = episode {
-                query.insert("episode_number", e.to_string());
+                query.insert("episode", e.to_string());
             }
-        } else {
-            query.insert("type", "movie".to_string());
         }
+
+        let mut headers = HeaderMap::new();
+        headers.insert(USER_AGENT, HeaderValue::from_static(APP_USER_AGENT));
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
 
         let resp = self
             .client
-            .get(&url)
-            .headers(self.build_headers())
+            .get(SUBDL_API_URL)
+            .headers(headers)
             .query(&query)
             .send()
             .await
             .map_err(|e| {
                 (
                     StatusCode::BAD_GATEWAY,
-                    format!("Gagal menghubungi OpenSubtitles API: {}", e),
+                    format!("Gagal menghubungi SubDL API: {}", e),
                 )
             })?;
 
@@ -130,122 +121,125 @@ impl OpenSubtitlesService {
             let err_text = resp
                 .text()
                 .await
-                .unwrap_or_else(|_| "Unknown OpenSubtitles error".to_string());
+                .unwrap_or_else(|_| "Unknown SubDL error".to_string());
             return Err((
                 status,
-                format!("OpenSubtitles API error (status {}): {}", status, err_text),
+                format!("SubDL API error (status {}): {}", status, err_text),
             ));
         }
 
-        let result: OsSubtitlesResponse = resp.json().await.map_err(|e| {
+        let result: SubdlResponse = resp.json().await.map_err(|e| {
             (
                 StatusCode::BAD_GATEWAY,
-                format!("Gagal mem-parsing respon OpenSubtitles: {}", e),
+                format!("Gagal mem-parsing respon SubDL: {}", e),
             )
         })?;
 
-        let mut subtitles = Vec::new();
-        if let Some(data_items) = result.data {
-            for item in data_items {
-                if let Some(attrs) = item.attributes {
-                    let first_file = attrs.files.as_ref().and_then(|f| f.first());
-                    if let Some(file) = first_file {
-                        let file_id = file.file_id.unwrap_or_default();
-                        let file_name = file
-                            .file_name
-                            .clone()
-                            .unwrap_or_else(|| "subtitle.srt".to_string());
+        let mut items = Vec::new();
 
-                        let lang = attrs
-                            .language
-                            .clone()
-                            .unwrap_or_else(|| "unknown".to_string());
+        if let Some(sub_list) = result.subtitles {
+            for (idx, sub) in sub_list.into_iter().enumerate() {
+                let default_lang = sub
+                    .language
+                    .clone()
+                    .or_else(|| sub.lang.clone())
+                    .unwrap_or_else(|| "id".to_string())
+                    .to_lowercase();
 
-                        let release = attrs
-                            .release
-                            .clone()
+                let author = sub.author.clone();
+
+                // Jika ada file hasil unpack (.srt individual)
+                if let Some(unpacked) = sub.unpack_files {
+                    for (u_idx, u_file) in unpacked.into_iter().enumerate() {
+                        let raw_url = u_file.url.as_deref().unwrap_or("");
+                        let clean_path = raw_url.split('?').next().unwrap_or(raw_url);
+
+                        let file_name = u_file
+                            .name
+                            .unwrap_or_else(|| format!("subtitle_{}_{}.srt", idx, u_idx));
+
+                        let release = u_file
+                            .release_name
+                            .or_else(|| sub.release_name.clone())
                             .unwrap_or_else(|| file_name.clone());
 
-                        let sub_id = item
-                            .id
-                            .clone()
-                            .or(attrs.subtitle_id.clone())
-                            .unwrap_or_else(|| file_id.to_string());
+                        let lang = u_file
+                            .language
+                            .map(|l| l.to_lowercase())
+                            .unwrap_or_else(|| default_lang.clone());
 
-                        subtitles.push(SubtitleItem {
-                            id: sub_id,
-                            file_id,
+                        let id = u_file
+                            .file_n_id
+                            .unwrap_or_else(|| format!("{}-{}", idx, u_idx));
+
+                        let download_url = format!(
+                            "/v1/api/subtitles/download?target={}",
+                            urlencoding::encode(clean_path)
+                        );
+
+                        items.push(SubtitleItem {
+                            id,
                             language: lang,
                             release,
                             file_name,
-                            rating: attrs.ratings,
-                            download_count: attrs.download_count,
-                            download_url: format!("/v1/api/subtitles/download/{}", file_id),
+                            author: author.clone(),
+                            download_url,
                         });
                     }
+                } else if let Some(raw_url) = sub.url {
+                    // Fallback jika tidak ter-unpack (file .zip)
+                    let clean_path = raw_url.split('?').next().unwrap_or(&raw_url);
+                    let file_name = sub
+                        .name
+                        .unwrap_or_else(|| format!("subtitle_{}.zip", idx));
+                    let release = sub
+                        .release_name
+                        .unwrap_or_else(|| file_name.clone());
+
+                    let download_url = format!(
+                        "/v1/api/subtitles/download?target={}",
+                        urlencoding::encode(clean_path)
+                    );
+
+                    items.push(SubtitleItem {
+                        id: format!("zip-{}", idx),
+                        language: default_lang,
+                        release,
+                        file_name,
+                        author,
+                        download_url,
+                    });
                 }
             }
         }
 
-        Ok(subtitles)
+        Ok(items)
     }
 
-    /// Ambil link unduh langsung dari OpenSubtitles Download API
-    pub async fn get_download_url(&self, file_id: i64) -> Result<String, (StatusCode, String)> {
+    /// Ambil URL download aman ke CDN SubDL
+    pub fn build_download_url(&self, target_path: &str) -> Result<String, (StatusCode, String)> {
         if !self.is_configured() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "OPENSUBTITLES_API_KEY belum dikonfigurasi di file .env".to_string(),
+                "SUBDL_API_KEY belum dikonfigurasi di file .env".to_string(),
             ));
         }
 
-        let url = format!("{}/download", OS_API_URL);
-        let payload = json!({
-            "file_id": file_id
-        });
-
-        let resp = self
-            .client
-            .post(&url)
-            .headers(self.build_headers())
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    format!("Gagal menghubungi OpenSubtitles Download API: {}", e),
-                )
-            })?;
-
-        let status = resp.status();
-        if !status.is_success() {
-            let err_text = resp
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown OpenSubtitles error".to_string());
+        // Keamanan: pastikan target_path hanya mengarah ke endpoint /subtitle/
+        if !target_path.starts_with("/subtitle/") {
             return Err((
-                status,
-                format!("Gagal membuat tautan unduhan (status {}): {}", status, err_text),
+                StatusCode::BAD_REQUEST,
+                "Target path tidak valid".to_string(),
             ));
         }
 
-        let dl_resp: OpenSubtitlesDownloadResponse = resp.json().await.map_err(|e| {
-            (
-                StatusCode::BAD_GATEWAY,
-                format!("Gagal membaca respon unduhan OpenSubtitles: {}", e),
-            )
-        })?;
+        let full_url = format!(
+            "{}{}?api_key={}",
+            SUBDL_DL_BASE,
+            target_path,
+            self.api_key.trim()
+        );
 
-        if let Some(link) = dl_resp.link {
-            Ok(link)
-        } else {
-            Err((
-                StatusCode::NOT_FOUND,
-                dl_resp
-                    .message
-                    .unwrap_or_else(|| "Link unduhan tidak tersedia".to_string()),
-            ))
-        }
+        Ok(full_url)
     }
 }

@@ -556,7 +556,7 @@
       <div class="subtitles-card">
         <div class="subtitles-header">
           <div class="subtitles-title">
-            <span>💬 Subtitle (OpenSubtitles REST API v2)</span>
+            <span>💬 Subtitle (SubDL API - Subscene Archive)</span>
             <span class="tag" id="subtitleCountBadge">0 Subtitle</span>
           </div>
           <div class="subtitles-controls">
@@ -614,7 +614,7 @@
         if (!h.tmdb_configured) {
           noticeBanner.style.display = 'flex';
           noticeBanner.textContent = '⚠️ ' + h.message;
-        } else if (!h.opensubtitles_configured) {
+        } else if (!h.subdl_configured) {
           // Hanya info bahwa subtitle belum disetel key-nya
           console.info(h.message);
         }
@@ -656,10 +656,10 @@
       }
     }
 
-    // Muat Subtitle dari Endpoint OpenSubtitles
+    // Muat Subtitle dari Endpoint SubDL
     async function loadSubtitles(type, id) {
       const lang = subtitleLangSelect.value;
-      subtitlesList.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">⏳ Mencari subtitle di OpenSubtitles...</p>';
+      subtitlesList.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">⏳ Mencari subtitle di SubDL (Arsip Subscene)...</p>';
       subtitleCountBadge.textContent = 'Mencari...';
 
       try {
@@ -682,9 +682,9 @@
 
         subtitlesList.innerHTML = '';
         subs.forEach(s => {
-          const isId = s.language === 'id';
-          const flag = isId ? '🇮🇩' : (s.language === 'en' ? '🇬🇧' : '🌐');
-          const langClass = isId ? 'id' : (s.language === 'en' ? 'en' : '');
+          const isId = s.language.toLowerCase().includes('id');
+          const flag = isId ? '🇮🇩' : (s.language.toLowerCase().includes('en') ? '🇬🇧' : '🌐');
+          const langClass = isId ? 'id' : (s.language.toLowerCase().includes('en') ? 'en' : '');
 
           const item = document.createElement('div');
           item.className = 'sub-item';
@@ -693,8 +693,7 @@
               <span class="sub-release" title="${s.release || s.file_name}">${s.release || s.file_name}</span>
               <div class="sub-meta">
                 <span class="lang-badge ${langClass}">${flag} ${s.language.toUpperCase()}</span>
-                <span>★ ${s.rating ? s.rating.toFixed(1) : '-'}</span>
-                <span>📥 ${s.download_count || 0}</span>
+                <span>👤 ${s.author || 'Anonim'}</span>
               </div>
             </div>
             <a href="${s.download_url}" target="_blank" class="sub-download-btn" title="Unduh Subtitle .SRT">

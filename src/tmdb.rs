@@ -1,6 +1,6 @@
 use crate::models::{
-    CardItem, DetailResponse, SeasonSummary, ServerInfo, TmdbDetailResponse, TmdbMediaItem,
-    TmdbSearchResponse, TmdbTrendingResponse,
+    CardItem, DetailResponse, PaginatedResponse, SeasonSummary, ServerInfo, TmdbDetailResponse,
+    TmdbMediaItem, TmdbPaginatedResponse,
 };
 use reqwest::Client;
 use std::collections::HashMap;
@@ -179,19 +179,162 @@ impl TmdbService {
         })
     }
 
-    /// GET /trending/{type}/week
+    /// Generic helper to fetch paginated lists from TMDB with custom limit support
+    pub async fn fetch_paginated_list(
+        &self,
+        path: &str,
+        media_type: &str,
+        page: u32,
+        limit: usize,
+        extra_params: &[(&str, &str)],
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
+        let page = page.max(1);
+        let limit = limit.clamp(1, 100);
+
+        // Kasus default TMDB: 20 item per page
+        if limit == 20 {
+            let page_str = page.to_string();
+            let mut params = Vec::from(extra_params);
+            params.push(("page", &page_str));
+
+            let data: TmdbPaginatedResponse = self.fetch_tmdb(path, &params).await?;
+            let cards = data
+                .results
+                .into_iter()
+                .map(|item| self.to_card(&item, media_type))
+                .collect();
+
+            return Ok(PaginatedResponse {
+                page,
+                per_page: 20,
+                total_pages: data.total_pages.unwrap_or(1),
+                total_results: data.total_results.unwrap_or(0),
+                results: cards,
+            });
+        }
+
+        // Custom limit (misal 10, 12, 24, 30, dll):
+        let start_idx = ((page - 1) as usize) * limit;
+        let end_idx = start_idx + limit;
+
+        let start_tmdb_page = (start_idx / 20) + 1;
+        let end_tmdb_page = ((end_idx.saturating_sub(1)) / 20) + 1;
+
+        let mut all_cards = Vec::new();
+        let mut total_results = 0u64;
+
+        for tmdb_page in start_tmdb_page..=end_tmdb_page {
+            let tmdb_page_str = tmdb_page.to_string();
+            let mut params = Vec::from(extra_params);
+            params.push(("page", &tmdb_page_str));
+
+            let data: TmdbPaginatedResponse = self.fetch_tmdb(path, &params).await?;
+            total_results = data.total_results.unwrap_or(0);
+
+            for item in data.results {
+                all_cards.push(self.to_card(&item, media_type));
+            }
+
+            if data.page.unwrap_or(1) >= data.total_pages.unwrap_or(1) {
+                break;
+            }
+        }
+
+        let offset_in_buffer = start_idx % 20;
+        let paged_cards: Vec<CardItem> = all_cards
+            .into_iter()
+            .skip(offset_in_buffer)
+            .take(limit)
+            .collect();
+
+        let total_pages = if total_results > 0 {
+            ((total_results as usize + limit - 1) / limit) as u32
+        } else {
+            1
+        };
+
+        Ok(PaginatedResponse {
+            page,
+            per_page: limit,
+            total_pages,
+            total_results,
+            results: paged_cards,
+        })
+    }
+
+    /// GET /trending/{type}/week?page=...
     pub async fn get_trending(
         &self,
         media_type: &str,
-    ) -> Result<Vec<CardItem>, (reqwest::StatusCode, String)> {
+        page: u32,
+        limit: usize,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
         let path = format!("/trending/{}/week", media_type);
-        let data: TmdbTrendingResponse = self.fetch_tmdb(&path, &[]).await?;
-        let cards = data
-            .results
-            .into_iter()
-            .map(|item| self.to_card(&item, media_type))
-            .collect();
-        Ok(cards)
+        self.fetch_paginated_list(&path, media_type, page, limit, &[]).await
+    }
+
+    /// GET /{type}/popular?page=...
+    pub async fn get_popular(
+        &self,
+        media_type: &str,
+        page: u32,
+        limit: usize,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
+        let path = format!("/{}/popular", media_type);
+        self.fetch_paginated_list(&path, media_type, page, limit, &[]).await
+    }
+
+    /// GET /movie/now_playing?page=...
+    pub async fn get_now_playing(
+        &self,
+        page: u32,
+        limit: usize,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
+        self.fetch_paginated_list("/movie/now_playing", "movie", page, limit, &[]).await
+    }
+
+    /// GET /{type}/top_rated?page=...
+    pub async fn get_top_rated(
+        &self,
+        media_type: &str,
+        page: u32,
+        limit: usize,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
+        let path = format!("/{}/top_rated", media_type);
+        self.fetch_paginated_list(&path, media_type, page, limit, &[]).await
+    }
+
+    /// GET /discover/{type}?page=...&sort_by=...&with_genres=...&primary_release_year=...
+    pub async fn get_discover(
+        &self,
+        media_type: &str,
+        page: u32,
+        limit: usize,
+        sort_by: Option<&str>,
+        genre: Option<&str>,
+        year: Option<u32>,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
+        let path = format!("/discover/{}", media_type);
+        let mut params = Vec::new();
+
+        let sort_val = sort_by.unwrap_or("popularity.desc");
+        params.push(("sort_by", sort_val));
+
+        if let Some(g) = genre {
+            params.push(("with_genres", g));
+        }
+
+        let year_str;
+        if let Some(y) = year {
+            year_str = y.to_string();
+            if media_type == "tv" {
+                params.push(("first_air_date_year", &year_str));
+            } else {
+                params.push(("primary_release_year", &year_str));
+            }
+        }
+
+        self.fetch_paginated_list(&path, media_type, page, limit, &params).await
     }
 
     /// GET /search/{type}?query=...&page=...
@@ -200,17 +343,11 @@ impl TmdbService {
         media_type: &str,
         query: &str,
         page: u32,
-    ) -> Result<(u32, u32, Vec<CardItem>), (reqwest::StatusCode, String)> {
+        limit: usize,
+    ) -> Result<PaginatedResponse, (reqwest::StatusCode, String)> {
         let path = format!("/search/{}", media_type);
-        let page_str = page.to_string();
-        let params = [("query", query), ("page", &page_str)];
-        let data: TmdbSearchResponse = self.fetch_tmdb(&path, &params).await?;
-        let cards = data
-            .results
-            .into_iter()
-            .map(|item| self.to_card(&item, media_type))
-            .collect();
-        Ok((data.page, data.total_pages, cards))
+        let params = [("query", query)];
+        self.fetch_paginated_list(&path, media_type, page, limit, &params).await
     }
 
     /// GET /{type}/{id}?append_to_response=videos
