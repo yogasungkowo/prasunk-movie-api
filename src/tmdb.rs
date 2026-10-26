@@ -120,11 +120,20 @@ impl TmdbService {
             String::new()
         };
 
+        let backdrop = item
+            .backdrop_path
+            .as_ref()
+            .map(|p| format!("{}w1280{}", IMG_BASE_URL, p));
+
+        let overview = item.overview.clone();
+
         CardItem {
             id: item.id,
             r#type: media_type.to_string(),
             title,
             poster,
+            backdrop,
+            overview,
             rating: item.vote_average,
             year,
         }
@@ -507,4 +516,5 @@ mod tests {
         assert_eq!(card.rating, Some(6.1));
     }
 }
+
 

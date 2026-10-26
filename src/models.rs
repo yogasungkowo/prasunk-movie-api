@@ -112,6 +112,10 @@ pub struct CardItem {
     pub r#type: String,
     pub title: String,
     pub poster: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backdrop: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overview: Option<String>,
     pub rating: Option<f64>,
     pub year: String,
 }
@@ -199,3 +203,4 @@ pub struct SubtitlesResponse {
 pub struct ErrorResponse {
     pub error: String,
 }
+
