@@ -180,7 +180,7 @@ impl OpenSubtitlesService {
                             file_name,
                             rating: attrs.ratings,
                             download_count: attrs.download_count,
-                            download_url: format!("/subtitles/download/{}", file_id),
+                            download_url: format!("/v1/api/subtitles/download/{}", file_id),
                         });
                     }
                 }

@@ -48,30 +48,30 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 |---|---|---|
 | `GET` | `/` | Antarmuka Web Player interaktif & API tester bawaan |
 | `GET` | `/player` | Alias antarmuka Web Player |
-| `GET` | `/health` | Status kesehatan server dan cek konfigurasi API Key (TMDB & OpenSubtitles) |
-| `GET` | `/film/trending` | Daftar film atau serial TV yang sedang trending sepekan ini |
-| `GET` | `/film/search` | Pencarian film atau serial TV berdasarkan kata kunci judul |
-| `GET` | `/film/:type/:id` | Detail metadata film/serial, trailer YouTube, dan 7 tautan server video embed |
-| `GET` | `/film/:type/:id/subtitles` | Pencarian subtitle film/serial dari OpenSubtitles REST API v2 |
-| `GET` | `/subtitles/download/:file_id` | Unduh file `.srt` subtitle langsung (HTTP 307 Redirect ke CDN) |
+| `GET` | `/v1/api/health` | Status kesehatan server dan cek konfigurasi API Key (TMDB & OpenSubtitles) |
+| `GET` | `/v1/api/film/trending` | Daftar film atau serial TV yang sedang trending sepekan ini |
+| `GET` | `/v1/api/film/search` | Pencarian film atau serial TV berdasarkan kata kunci judul |
+| `GET` | `/v1/api/film/:type/:id` | Detail metadata film/serial, trailer YouTube, dan 7 tautan server video embed |
+| `GET` | `/v1/api/film/:type/:id/subtitles` | Pencarian subtitle film/serial dari OpenSubtitles REST API v2 |
+| `GET` | `/v1/api/subtitles/download/:file_id` | Unduh file `.srt` subtitle langsung (HTTP 307 Redirect ke CDN) |
 
 ---
 
 ## ⚙️ Parameter & Filter Options
 
-### 1. Trending (`/film/trending`)
+### 1. Trending (`/v1/api/film/trending`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
 |---|---|---|---|
 | `type` | String | `movie` | Kategori media: `movie` (film) atau `tv` (serial TV) |
 
-### 2. Pencarian Judul (`/film/search`)
+### 2. Pencarian Judul (`/v1/api/film/search`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
 |---|---|---|---|
 | `q` | String | *wajib* | Kata kunci judul film atau serial (contoh: `avengers`) |
 | `type` | String | `movie` | Kategori media: `movie` atau `tv` |
 | `page` | Integer | `1` | Nomor halaman paginasi data |
 
-### 3. Detail & Embed Player (`/film/:type/:id`)
+### 3. Detail & Embed Player (`/v1/api/film/:type/:id`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
 |---|---|---|---|
 | `:type` *(Path)* | String | *wajib* | `movie` atau `tv` |
@@ -79,7 +79,7 @@ Dibuat & dikembangkan oleh **[@yogasungkowo](https://github.com/yogasungkowo)**.
 | `season` *(Query)* | Integer | `1` | Nomor Season (khusus kategori `tv`) |
 | `episode` *(Query)* | Integer | `1` | Nomor Episode (khusus kategori `tv`) |
 
-### 4. Pencarian Subtitle (`/film/:type/:id/subtitles`)
+### 4. Pencarian Subtitle (`/v1/api/film/:type/:id/subtitles`)
 | Parameter | Tipe | Default | Deskripsi / Nilai yang Didukung |
 |---|---|---|---|
 | `lang` | String | `id,en` | Kode bahasa subtitle dipisah koma (contoh: `id`, `en`, atau `id,en`) |
@@ -167,28 +167,28 @@ Antarmuka web modern bawaan siap digunakan untuk:
 
 ```bash
 # 1. Cek info status server & API keys
-curl "http://localhost:3000/health"
+curl "http://localhost:3000/v1/api/health"
 
 # 2. Mengambil daftar film trending
-curl "http://localhost:3000/film/trending?type=movie"
+curl "http://localhost:3000/v1/api/film/trending?type=movie"
 
 # 3. Mengambil serial TV trending
-curl "http://localhost:3000/film/trending?type=tv"
+curl "http://localhost:3000/v1/api/film/trending?type=tv"
 
 # 4. Pencarian judul film
-curl "http://localhost:3000/film/search?q=resident+evil&type=movie"
+curl "http://localhost:3000/v1/api/film/search?q=resident+evil&type=movie"
 
 # 5. Detail film + 7 server pemutar embed
-curl "http://localhost:3000/film/movie/35791"
+curl "http://localhost:3000/v1/api/film/movie/35791"
 
 # 6. Detail serial TV Season 1 Episode 1
-curl "http://localhost:3000/film/tv/1399?season=1&episode=1"
+curl "http://localhost:3000/v1/api/film/tv/1399?season=1&episode=1"
 
 # 7. Cari subtitle Indonesia & Inggris untuk film
-curl "http://localhost:3000/film/movie/35791/subtitles?lang=id,en"
+curl "http://localhost:3000/v1/api/film/movie/35791/subtitles?lang=id,en"
 
 # 8. Download file subtitle (.srt)
-curl -L -O "http://localhost:3000/subtitles/download/987654"
+curl -L -O "http://localhost:3000/v1/api/subtitles/download/987654"
 ```
 
 ---

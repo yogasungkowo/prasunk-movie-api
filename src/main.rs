@@ -66,10 +66,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 6. Router API & Web Player
-    let app = axum::Router::new()
-        .route("/", axum::routing::get(player_page_handler))
-        .route("/player", axum::routing::get(player_page_handler))
+    // 6. Router API (/v1/api/...) & Web Player
+    let api_routes = axum::Router::new()
         .route("/health", axum::routing::get(health_handler))
         .route("/film/trending", axum::routing::get(trending_handler))
         .route("/film/search", axum::routing::get(search_handler))
@@ -81,7 +79,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/subtitles/download/{file_id}",
             axum::routing::get(download_subtitle_handler),
-        )
+        );
+
+    let app = axum::Router::new()
+        .route("/", axum::routing::get(player_page_handler))
+        .route("/player", axum::routing::get(player_page_handler))
+        .nest("/v1/api", api_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);
@@ -91,13 +94,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("🚀 Server berjalan di http://{}", addr);
     tracing::info!("📺 Web Player & Subtitle Tester siap dibuka: http://localhost:{}", port);
-    tracing::info!("📚 Endpoints:");
-    tracing::info!("   - GET /film/trending?type=movie|tv");
-    tracing::info!("   - GET /film/search?q=judul&type=movie|tv&page=1");
-    tracing::info!("   - GET /film/:type/:id?season=1&episode=1");
-    tracing::info!("   - GET /film/:type/:id/subtitles?lang=id,en&season=1&episode=1");
-    tracing::info!("   - GET /subtitles/download/:file_id");
-    tracing::info!("   - GET /health");
+    tracing::info!("📚 Endpoints (Prefix /v1/api):");
+    tracing::info!("   - GET /v1/api/health");
+    tracing::info!("   - GET /v1/api/film/trending?type=movie|tv");
+    tracing::info!("   - GET /v1/api/film/search?q=judul&type=movie|tv&page=1");
+    tracing::info!("   - GET /v1/api/film/:type/:id?season=1&episode=1");
+    tracing::info!("   - GET /v1/api/film/:type/:id/subtitles?lang=id,en&season=1&episode=1");
+    tracing::info!("   - GET /v1/api/subtitles/download/:file_id");
 
     axum::serve(listener, app).await?;
 

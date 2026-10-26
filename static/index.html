@@ -608,7 +608,7 @@
     let currentFilmType = 'movie';
 
     // Cek status API
-    fetch('/health')
+    fetch('/v1/api/health')
       .then(r => r.json())
       .then(h => {
         if (!h.tmdb_configured) {
@@ -627,7 +627,7 @@
         currentFilmId = id;
         currentFilmType = type;
 
-        const res = await fetch(`/film/${type}/${id}`);
+        const res = await fetch(`/v1/api/film/${type}/${id}`);
         if (!res.ok) {
           const err = await res.json();
           alert('Gagal memuat film: ' + (err.error || res.statusText));
@@ -663,7 +663,7 @@
       subtitleCountBadge.textContent = 'Mencari...';
 
       try {
-        const res = await fetch(`/film/${type}/${id}/subtitles?lang=${encodeURIComponent(lang)}`);
+        const res = await fetch(`/v1/api/film/${type}/${id}/subtitles?lang=${encodeURIComponent(lang)}`);
         if (!res.ok) {
           const err = await res.json();
           subtitlesList.innerHTML = `<p style="color:#f87171; font-size:0.85rem;">⚠️ ${err.error || 'Gagal memuat subtitle.'}</p>`;
@@ -778,7 +778,7 @@
     // Ambil Trending
     async function loadTrending() {
       try {
-        const res = await fetch('/film/trending?type=movie');
+        const res = await fetch('/v1/api/film/trending?type=movie');
         if (!res.ok) return;
         const data = await res.json();
         renderCards(data.results);
@@ -803,7 +803,7 @@
 
       document.getElementById('gridTitle').textContent = `🔍 Hasil Pencarian: "${q}"`;
       try {
-        const res = await fetch(`/film/search?q=${encodeURIComponent(q)}&type=movie`);
+        const res = await fetch(`/v1/api/film/search?q=${encodeURIComponent(q)}&type=movie`);
         if (!res.ok) {
           alert('Pencarian gagal.');
           return;
